@@ -27,6 +27,7 @@ import android.os.Parcelable;
 import android.support.v4.util.SparseArrayCompat;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.LongSparseArray;
 import android.util.SparseArray;
 import android.util.StateSet;
 import android.view.MotionEvent;
@@ -1561,6 +1562,7 @@ public class StaggeredGridView extends ViewGroup {
   final View obtainView(int position, View optScrap) {
     View view = recycler.getTransientStateView(position);
     if (view != null) {
+      view = adapter.getView(position, view, this);
       return view;
     }
 
@@ -1807,18 +1809,19 @@ public class StaggeredGridView extends ViewGroup {
   }
 
   private class RecycleBin {
-    private ArrayList<View>[] mScrapViews;
-    private int mViewTypeCount;
-    private int mMaxScrap;
+    private ArrayList<View>[] scrapViews;
+    private int viewTypeCount;
+    private int maxScrap;
 
-    private SparseArray<View> mTransientStateViews;
+    private SparseArray<View> transientStateViews;
+    private LongSparseArray<View> transientStateViewsById;
 
     public void setViewTypeCount(int viewTypeCount) {
       if (viewTypeCount < 1) {
         throw new IllegalArgumentException(
             "Must have at least one view type (" + viewTypeCount + " types reported)");
       }
-      if (viewTypeCount == mViewTypeCount) {
+      if (viewTypeCount == this.viewTypeCount) {
         return;
       }
 
@@ -1826,61 +1829,87 @@ public class StaggeredGridView extends ViewGroup {
       for (int i = 0; i < viewTypeCount; i++) {
         scrapViews[i] = new ArrayList<View>();
       }
-      mViewTypeCount = viewTypeCount;
-      mScrapViews = scrapViews;
+      this.viewTypeCount = viewTypeCount;
+      this.scrapViews = scrapViews;
     }
 
     public void clear() {
-      final int typeCount = mViewTypeCount;
+      final int typeCount = viewTypeCount;
       for (int i = 0; i < typeCount; i++) {
-        mScrapViews[i].clear();
+        scrapViews[i].clear();
       }
-      if (mTransientStateViews != null) {
-        mTransientStateViews.clear();
+      if (transientStateViews != null) {
+        transientStateViews.clear();
+      }
+      if (transientStateViewsById != null) {
+        transientStateViewsById.clear();
       }
     }
 
     public void clearTransientViews() {
-      if (mTransientStateViews != null) {
-        mTransientStateViews.clear();
+      if (transientStateViews != null) {
+        transientStateViews.clear();
+      }
+      if (transientStateViewsById != null) {
+        transientStateViewsById.clear();
       }
     }
 
     public void addScrap(View v) {
       final LayoutParams lp = (LayoutParams) v.getLayoutParams();
       if (v.hasTransientState()) {
-        if (mTransientStateViews == null) {
-          mTransientStateViews = new SparseArray<View>();
+        if (adapter != null) {
+          if (adapter.hasStableIds()) {
+            if (transientStateViewsById == null) {
+              transientStateViewsById = new LongSparseArray<View>();
+            }
+            transientStateViewsById.put(lp.id, v);
+          } else {
+            if (transientStateViews == null) {
+              transientStateViews = new SparseArray<View>();
+            }
+            transientStateViews.put(lp.position, v);
+          }
         }
-        mTransientStateViews.put(lp.position, v);
         return;
       }
 
       final int childCount = getChildCount();
-      if (childCount > mMaxScrap) {
-        mMaxScrap = childCount;
+      if (childCount > maxScrap)
+
+      {
+        maxScrap = childCount;
       }
 
-      ArrayList<View> scrap = mScrapViews[lp.viewType];
-      if (scrap.size() < mMaxScrap) {
+      ArrayList<View> scrap = scrapViews[lp.viewType];
+      if (scrap.size() < maxScrap)
+
+      {
         scrap.add(v);
       }
     }
 
     public View getTransientStateView(int position) {
-      if (mTransientStateViews == null) {
-        return null;
+      if (adapter != null && adapter.hasStableIds() && transientStateViewsById != null) {
+        final long id = adapter.getItemId(position);
+        View result = transientStateViewsById.get(id);
+        transientStateViewsById.remove(id);
+        return result;
       }
 
-      final View result = mTransientStateViews.get(position);
-      if (result != null) {
-        mTransientStateViews.remove(position);
+      if (transientStateViews != null) {
+        final View result = transientStateViews.get(position);
+        if (result != null) {
+          transientStateViews.remove(position);
+        }
+        return result;
       }
-      return result;
+
+      return null;
     }
 
     public View getScrapView(int type) {
-      ArrayList<View> scrap = mScrapViews[type];
+      ArrayList<View> scrap = scrapViews[type];
       if (scrap.isEmpty()) {
         return null;
       }
