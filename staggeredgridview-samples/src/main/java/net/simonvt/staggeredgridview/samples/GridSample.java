@@ -33,7 +33,6 @@ public class GridSample extends Activity {
     View emptyView = findViewById(android.R.id.empty);
     grid = (StaggeredGridView) findViewById(android.R.id.list);
     grid.setEmptyView(emptyView);
-    grid.setItemMargin(10);
     grid.setOnItemClickListener(new StaggeredGridView.OnItemClickListener() {
       @Override
       public void onItemClick(StaggeredGridView parent, View view, int position, long id) {
@@ -61,7 +60,9 @@ public class GridSample extends Activity {
 
     findViewById(R.id.add_header).setOnClickListener(new View.OnClickListener() {
       @Override public void onClick(View v) {
-        items.add(new Header(++id, "Header " + id, getRandomColor()));
+        final long headerId = id;
+        id++;
+        items.add(new Header(headerId, "Header " + headerId, getRandomColor()));
         adapter.notifyDataSetChanged();
       }
     });
@@ -72,7 +73,7 @@ public class GridSample extends Activity {
       }
     });
 
-    items.add(new Header(id++, "Header 1", getRandomColor()));
+    items.add(new Header(id++, "Header 0", getRandomColor()));
     for (long end = id + 10; id <= end; id++) {
       items.add(createItem(id));
     }
@@ -181,6 +182,10 @@ public class GridSample extends Activity {
 
     @Override public boolean isEnabled(int position) {
       return !(getItem(position) instanceof Header);
+    }
+
+    @Override public boolean hasStableIds() {
+      return true;
     }
 
     @Override public View getView(int position, View convertView, ViewGroup parent) {
